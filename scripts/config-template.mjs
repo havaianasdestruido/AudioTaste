@@ -2,7 +2,7 @@
 
 // Shared renderer for config.js, used by scripts/serve.mjs (local dev,
 // from .env) and scripts/build-config.mjs (Vercel build, from env vars).
-export function renderConfig(url, key) {
+export function renderConfig(url, key, lastfmKey) {
   return `// ============================================================
 // AudioTaste - Supabase connection settings
 // GENERATED from environment variables. Do not edit by hand.
@@ -12,6 +12,10 @@ export function renderConfig(url, key) {
 
 const SUPABASE_URL = ${JSON.stringify(url)};
 const SUPABASE_ANON_KEY = ${JSON.stringify(key)};
+
+// Public Last.fm API key, used by the client to fetch album art and
+// cache it in localStorage. Not a secret (like the anon key).
+const LASTFM_API_KEY = ${JSON.stringify(lastfmKey || "")};
 
 // Common pieces for every REST request to the Supabase API.
 const API = {

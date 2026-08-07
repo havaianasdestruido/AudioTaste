@@ -136,7 +136,84 @@ function render() {
   formCardEl.classList.remove("hidden");
   reviewsTitleEl.classList.remove("hidden");
   renderReviews();
+  Covers.hydrate(heroEl);
 }
+
+/* ---------- Client-side album art (Last.fm + localStorage) ---------- */
+
+// Covers missing from the DB are fetched in the browser, cached in
+// localStorage, and injected into the hero cover if it has no <img>.
+
+function coverCacheKey(artist, title) {
+  return "at.cover." + hashString(artist + "\u0000" + title);
+}
+
+const Covers = {
+  cached(artist, title) {
+    try {
+      const raw = localStorage.getItem(coverCacheKey(artist, title));
+      if (!raw) return null;
+      const j = JSON.parse(raw);
+      return j.url || null;
+    } catch {
+      return null;
+    }
+  },
+  store(artist, title, url, source) {
+    try {
+      localStorage.setItem(coverCacheKey(artist, title), JSON.stringify({ url, source: source || null, at: Date.now() }));
+    } catch {
+      /* storage full / private mode */
+    }
+  },
+  async lookup(artist, title) {
+    const singles = String(title).includes("Singles & Sessions");
+    const p = new URLSearchParams({
+      method: singles ? "artist.gettopalbums" : "album.getinfo",
+      artist,
+      api_key: LASTFM_API_KEY,
+      format: "json"
+    });
+    if (!singles) p.set("album", title);
+    const r = await fetch("https://ws.audioscrobbler.com/2.0/?" + p.toString());
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (j.error) return null;
+    const list = singles
+      ? j.topalbums && j.topalbums.album
+      : j.album && [j.album];
+    if (!list || !list.length) return null;
+    for (const size of ["mega", "extralarge", "large"]) {
+      const hit = list[0].image.find((i) => i.size === size && i["#text"]);
+      if (hit) return hit["#text"];
+    }
+    return null;
+  },
+  async resolve(artist, title) {
+    const cached = this.cached(artist, title);
+    if (cached) return cached;
+    const url = await this.lookup(artist, title);
+    if (url) this.store(artist, title, url);
+    return url;
+  },
+  hydrate(root) {
+    if (!LASTFM_API_KEY || LASTFM_API_KEY.startsWith("YOUR-") || LASTFM_API_KEY.startsWith("your-")) return;
+    root.querySelectorAll(".album-cover[data-artist], .hero-cover[data-artist]").forEach((el) => {
+      if (el.querySelector("img")) return;
+      const artist = el.getAttribute("data-artist");
+      const title = el.getAttribute("data-title");
+      this.resolve(artist, title).then((url) => {
+        if (!url || !el.isConnected) return;
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = "Cover art for " + title;
+        img.loading = "lazy";
+        img.onerror = () => img.remove();
+        el.appendChild(img);
+      });
+    });
+  }
+};
 
 function buildHeroHTML() {
   const year = album.release_year ? " " + album.release_year : "";
@@ -158,7 +235,8 @@ function buildHeroHTML() {
       : '<div class="hero-rating"><span class="review-count">No ratings yet</span></div>';
 
   return (
-    '<div class="hero-cover" style="background:' + coverGradient(album) + '">' +
+    '<div class="hero-cover" data-artist="' + esc(album.artist) + '" data-title="' + esc(album.title) +
+    '" style="background:' + coverGradient(album) + '">' +
     '<span class="cover-initials">' + esc(initials(album.title)) + "</span>" + coverImg +
     "</div>" +
     '<div class="hero-info">' +

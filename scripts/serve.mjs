@@ -38,7 +38,7 @@ const env = loadEnv();
 function configJs() {
   const url = env.SUPABASE_URL || "https://YOUR-PROJECT-URL.supabase.co";
   const key = env.SUPABASE_ANON_KEY || "YOUR-PUBLIC-ANON-KEY";
-  return renderConfig(url, key);
+  return renderConfig(url, key, env.LASTFM_API_KEY);
 }
 
 const MIME = {

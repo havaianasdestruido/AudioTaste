@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { renderConfig } from "./config-template.mjs";
 
 const env = {};
-for (const k of ["SUPABASE_URL", "SUPABASE_ANON_KEY"]) {
+for (const k of ["SUPABASE_URL", "SUPABASE_ANON_KEY", "LASTFM_API_KEY"]) {
   if (process.env[k]) env[k] = process.env[k];
 }
 
@@ -20,7 +20,7 @@ try {
     if (!t || t.startsWith("#") || !t.includes("=")) continue;
     const i = t.indexOf("=");
     const k = t.slice(0, i).trim();
-    if ((k === "SUPABASE_URL" || k === "SUPABASE_ANON_KEY") && !env[k]) {
+    if ((k === "SUPABASE_URL" || k === "SUPABASE_ANON_KEY" || k === "LASTFM_API_KEY") && !env[k]) {
       env[k] = t.slice(i + 1).trim();
     }
   }
@@ -30,7 +30,7 @@ try {
 
 const url = env.SUPABASE_URL || "https://YOUR-PROJECT-URL.supabase.co";
 const key = env.SUPABASE_ANON_KEY || "YOUR-PUBLIC-ANON-KEY";
-writeFileSync("config.js", renderConfig(url, key));
+writeFileSync("config.js", renderConfig(url, key, env.LASTFM_API_KEY));
 
 if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
   console.log("config.js written with real Supabase credentials");
