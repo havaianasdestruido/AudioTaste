@@ -1,6 +1,9 @@
 # Secrets — never commit real credentials
 .env
 
+# Generated from .env / Vercel env by scripts/build-config.mjs
+config.js
+
 # Node
 node_modules/
 
