@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AudioTaste — Discover, Rate &amp; Review Albums</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">&#9835;</span> AudioTaste
+      </a>
+      <nav>
+        <a href="index.html" class="nav-link active">Albums</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section class="hero">
+      <h1>Rate the albums that move you.</h1>
+      <p>Discover music, share your rating out of 10, and read what others think.</p>
+    </section>
+
+    <div id="config-banner" class="config-banner hidden"></div>
+
+    <section class="toolbar">
+      <input type="search" id="search-input" placeholder="Search by title or artist...">
+      <select id="genre-select" aria-label="Filter by genre">
+        <option value="all">All Genres</option>
+      </select>
+      <select id="sort-select" aria-label="Sort albums">
+        <option value="rating-desc">Highest Rated</option>
+        <option value="rating-asc">Lowest Rated</option>
+        <option value="newest">Newest Releases</option>
+        <option value="oldest">Oldest Releases</option>
+        <option value="title">Alphabetical</option>
+      </select>
+      <button id="add-album-btn" class="btn btn-primary">+ Add Album</button>
+    </section>
+
+    <div id="loading" class="loading">Loading albums&hellip;</div>
+    <div id="error-state" class="empty-state hidden"></div>
+
+    <div id="album-grid" class="album-grid"></div>
+
+    <div id="empty-state" class="empty-state hidden">
+      <p>No albums match your search.</p>
+      <p style="margin-top:8px;"><button id="empty-add-btn" class="btn btn-ghost">Add the first album</button></p>
+    </div>
+
+  </main>
+
+  <!-- Add Album modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Add a New Album</h2>
+      <form id="album-form" novalidate>
+        <label>Album Title
+          <input type="text" id="f-title" maxlength="200" required>
+        </label>
+        <label>Artist
+          <input type="text" id="f-artist" maxlength="200" required>
+        </label>
+        <label>Release Year
+          <input type="number" id="f-year" min="1900" max="2100" step="1" placeholder="e.g. 2015">
+        </label>
+        <label>Genre
+          <input type="text" id="f-genre" list="genre-list" maxlength="60" placeholder="e.g. Hip-Hop">
+          <datalist id="genre-list"></datalist>
+        </label>
+        <label>Cover Image URL (optional)
+          <input type="url" id="f-cover" placeholder="https://...">
+        </label>
+        <label>Description
+          <textarea id="f-desc" rows="3" maxlength="1000"></textarea>
+        </label>
+        <p id="album-form-error" class="form-error hidden"></p>
+        <div class="modal-actions">
+          <button type="button" id="cancel-album-btn" class="btn btn-ghost">Cancel</button>
+          <button type="submit" id="submit-album-btn" class="btn btn-primary">Add Album</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-root"></div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
