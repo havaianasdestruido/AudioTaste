@@ -1,0 +1,18 @@
+{
+  "name": "audio-taste",
+  "version": "1.0.0",
+  "description": "Discover, Rate & Review Albums",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-config.mjs"
+  },
+  "keywords": [
+    "music",
+    "albums",
+    "reviews"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/speed-insights": "^2.0.0"
+  }
+}
