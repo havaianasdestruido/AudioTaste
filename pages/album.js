@@ -16,7 +16,7 @@ const albumId = params.get("id");
 let album = null; // current album with .reviews[]
 
 const ALBUM_SELECT =
-  "id,title,artist,release_year,genre,cover_url,description,created_at," +
+  "id,title,artist,release_year,genre,cover_url,description,plays,created_at," +
   "reviews(id,album_id,username,rating,review_text,created_at)";
 
 /* ---------- DOM references ---------- */
@@ -141,6 +141,9 @@ function render() {
 function buildHeroHTML() {
   const year = album.release_year ? " " + album.release_year : "";
   const genre = album.genre ? " \u00b7 " + esc(album.genre) : "";
+  const plays = album.plays
+    ? " \u00b7 " + album.plays + " play" + (album.plays === 1 ? "" : "s")
+    : "";
   const avg = avgRating(album.reviews);
   const count = album.reviews ? album.reviews.length : 0;
   const coverImg = album.cover_url
@@ -161,7 +164,7 @@ function buildHeroHTML() {
     '<div class="hero-info">' +
     "<h1>" + esc(album.title) + "</h1>" +
     '<p class="artist">' + esc(album.artist) + "</p>" +
-    '<p class="hero-meta">' + (year || "Unknown year") + genre + "</p>" +
+    '<p class="hero-meta">' + (year || "Unknown year") + genre + plays + "</p>" +
     (album.description
       ? '<p class="hero-description">' + esc(album.description) + "</p>"
       : "") +

@@ -43,6 +43,27 @@
       <button id="add-album-btn" class="btn btn-primary">+ Add Album</button>
     </section>
 
+    <section class="trends-bar">
+      <span class="trends-label">Most popular</span>
+      <input type="date" id="trend-from" aria-label="From date">
+      <span class="trends-dash">to</span>
+      <input type="date" id="trend-to" aria-label="To date">
+      <select id="trend-group" aria-label="Group trends by">
+        <option value="album">Group by Album</option>
+        <option value="artist">Group by Artist</option>
+      </select>
+      <button id="trend-apply" class="btn btn-primary btn-sm">Show</button>
+      <button id="trend-clear" class="btn btn-ghost btn-sm hidden">Clear</button>
+    </section>
+
+    <div id="trends-panel" class="hidden">
+      <div class="trends-head">
+        <h2 id="trends-title">Most popular</h2>
+        <p id="trends-subtitle" class="trends-subtitle"></p>
+      </div>
+      <ol id="trends-list" class="trends-list"></ol>
+    </div>
+
     <div id="loading" class="loading">Loading albums&hellip;</div>
     <div id="error-state" class="empty-state hidden"></div>
 

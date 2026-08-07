@@ -33,7 +33,7 @@ const toastRoot = document.getElementById("toast-root");
    PostgREST "embedded resource" — one request returns albums AND
    their reviews, demonstrating a relational JOIN via the API. */
 const ALBUM_SELECT =
-  "id,title,artist,release_year,genre,cover_url,description,created_at," +
+  "id,title,artist,release_year,genre,cover_url,description,plays,created_at," +
   "reviews(id,album_id,username,rating,review_text,created_at)";
 
 /* ---------- Small helpers ---------- */
@@ -203,6 +203,9 @@ function getFilteredAlbums() {
 function cardHTML(album) {
   const year = album.release_year ? " " + album.release_year : "";
   const genre = album.genre ? " \u00b7 " + esc(album.genre) : "";
+  const plays = album.plays
+    ? " \u00b7 " + album.plays + " play" + (album.plays === 1 ? "" : "s")
+    : "";
   const rating =
     album.avg !== null
       ? starsHTML(album.avg) + '<span class="card-score">' + fmtAvg(album.avg) + " / 10</span>"
@@ -215,7 +218,7 @@ function cardHTML(album) {
     '<div class="card-body">' +
     '<h3 class="card-title" title="' + esc(album.title) + '">' + esc(album.title) + "</h3>" +
     '<p class="card-artist">' + esc(album.artist) + "</p>" +
-    '<p class="card-meta">' + (year || "") + genre + "</p>" +
+    '<p class="card-meta">' + (year || "") + genre + plays + "</p>" +
     '<div class="card-rating">' + rating + "</div>" +
     '<a class="btn btn-ghost btn-view" href="pages/album.html?id=' + album.id + '">' +
     "View Album" +
@@ -257,6 +260,195 @@ sortSelect.addEventListener("change", (e) => {
   sortBy = e.target.value;
   renderAlbums();
 });
+
+/* ---------- Trends: most popular in a date range ---------- */
+
+const trendFrom = document.getElementById("trend-from");
+const trendTo = document.getElementById("trend-to");
+const trendGroup = document.getElementById("trend-group");
+const trendApply = document.getElementById("trend-apply");
+const trendClear = document.getElementById("trend-clear");
+const trendsPanel = document.getElementById("trends-panel");
+const trendsTitle = document.getElementById("trends-title");
+const trendsSubtitle = document.getElementById("trends-subtitle");
+const trendsList = document.getElementById("trends-list");
+
+function fmtRangeDate(value) {
+  const d = new Date(value + "T00:00:00");
+  return isNaN(d) ? value : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function setTrendsVisible(on) {
+  document.querySelector(".toolbar").classList.toggle("hidden", on);
+  grid.classList.toggle("hidden", on);
+  loadingEl.classList.add("hidden");
+  emptyEl.classList.add("hidden");
+  errorEl.classList.add("hidden");
+  trendsPanel.classList.toggle("hidden", !on);
+  trendClear.classList.toggle("hidden", !on);
+}
+
+trendApply.addEventListener("click", runTrends);
+trendClear.addEventListener("click", clearTrends);
+
+function clearTrends() {
+  setTrendsVisible(false);
+  trendsList.innerHTML = "";
+}
+
+async function runTrends() {
+  const from = trendFrom.value;
+  const to = trendTo.value;
+  if (!from || !to) {
+    toast("Pick both a start and end date.", "error");
+    return;
+  }
+  if (from > to) {
+    toast("Start date must be before the end date.", "error");
+    return;
+  }
+
+  setTrendsVisible(true);
+  trendApply.disabled = true;
+  trendsSubtitle.textContent = fmtRangeDate(from) + " \u2013 " + fmtRangeDate(to);
+  trendsList.innerHTML =
+    '<li class="empty-state" style="border:none;background:none">Loading scrobbles&hellip;</li>';
+
+  try {
+    // Count scrobbles per album inside the window.
+    const rows = await fetchScrobblesInRange(from, to);
+    const counts = new Map();
+    for (const r of rows) counts.set(r.album_id, (counts.get(r.album_id) || 0) + 1);
+
+    if (counts.size === 0) {
+      trendsTitle.textContent = "Most popular";
+      trendsList.innerHTML =
+        '<li class="empty-state" style="border:none;background:none">No scrobbles in this period.</li>';
+      return;
+    }
+
+    const albumsById = await fetchAlbumsByIds([...counts.keys()]);
+    renderTrends(counts, albumsById, trendGroup.value);
+  } catch (err) {
+    trendsList.innerHTML = "";
+    trendsSubtitle.textContent = "Could not load trends.";
+    toast("Failed to load trends: " + err.message, "error");
+  } finally {
+    trendApply.disabled = false;
+  }
+}
+
+async function fetchScrobblesInRange(from, to) {
+  const base =
+    "/scrobbles?select=album_id" +
+    "&scrobbled_at=gte." + encodeURIComponent(from + "T00:00:00") +
+    "&scrobbled_at=lte." + encodeURIComponent(to + "T23:59:59");
+  const STEP = 1000;
+  let all = [];
+  let offset = 0;
+  let total = null;
+
+  while (true) {
+    const res = await fetch(API.base + base, {
+      headers: { ...API.headers, Range: offset + "-" + (offset + STEP - 1) }
+    });
+    if (!res.ok) {
+      let detail = res.status + " " + res.statusText;
+      try {
+        const err = await res.json();
+        detail = err.message || err.details || detail;
+      } catch (e) {
+        /* non-JSON error body */
+      }
+      throw new Error(detail);
+    }
+    const part = await res.json();
+    all = all.concat(part);
+    const cr = res.headers.get("Content-Range");
+    const m = cr && cr.match(/\/(\d+)\s*$/);
+    total = m ? Number(m[1]) : all.length;
+    offset += STEP;
+    if (offset >= total || part.length === 0) break;
+  }
+  return all;
+}
+
+async function fetchAlbumsByIds(ids) {
+  const rows = await getJSON(
+    "/albums?select=" + encodeURIComponent(ALBUM_SELECT) +
+      "&id=in.(" + ids.join(",") + ")"
+  );
+  const byId = new Map();
+  for (const a of rows) byId.set(a.id, a);
+  return byId;
+}
+
+function renderTrends(counts, albumsById, groupBy) {
+  const byAlbum = [];
+  for (const [id, n] of counts) {
+    const album = albumsById.get(id);
+    if (album) byAlbum.push({ album, n });
+  }
+
+  let list;
+  if (groupBy === "artist") {
+    const m = new Map();
+    for (const { album, n } of byAlbum) {
+      const cur = m.get(album.artist) || { artist: album.artist, n: 0, top: null, topPlays: -1 };
+      cur.n += n;
+      if (n > cur.topPlays) {
+        cur.top = album;
+        cur.topPlays = n;
+      }
+      m.set(album.artist, cur);
+    }
+    list = [...m.values()].sort((a, b) => b.n - a.n);
+    trendsTitle.textContent = "Most popular artists";
+  } else {
+    list = byAlbum.sort((a, b) => b.n - a.n);
+    trendsTitle.textContent = "Most popular albums";
+  }
+
+  const top = list.slice(0, 100);
+  trendsList.innerHTML = top
+    .map((e, i) => trendItemHTML(e, i + 1, groupBy))
+    .join("");
+}
+
+function trendItemHTML(e, rank, groupBy) {
+  if (groupBy === "artist") {
+    return (
+      '<li class="trend-item">' +
+      '<span class="trend-rank">' + rank + "</span>" +
+      '<div class="trend-info">' +
+      '<span class="trend-title">' + esc(e.artist) + "</span>" +
+      "</div>" +
+      '<span class="trend-stats">' +
+      '<span class="trend-plays">' + e.n + " play" + (e.n === 1 ? "" : "s") + "</span>" +
+      "</span></li>"
+    );
+  }
+
+  const a = e.album;
+  const avg = avgRating(a.reviews);
+  const rating =
+    avg !== null
+      ? starsHTML(avg) + '<span class="card-score">' + fmtAvg(avg) + " / 10</span>"
+      : "";
+  return (
+    '<li class="trend-item">' +
+    '<span class="trend-rank">' + rank + "</span>" +
+    '<a class="trend-cover" href="pages/album.html?id=' + a.id + '">' + coverHTML(a) + "</a>" +
+    '<div class="trend-info">' +
+    '<a class="trend-title" href="pages/album.html?id=' + a.id + '">' + esc(a.title) + "</a>" +
+    '<span class="trend-artist">' + esc(a.artist) + "</span>" +
+    "</div>" +
+    '<span class="trend-stats">' +
+    '<span class="trend-plays">' + e.n + " play" + (e.n === 1 ? "" : "s") + "</span>" +
+    rating +
+    "</span></li>"
+  );
+}
 
 /* ---------- Add album: CREATE (POST /albums) ---------- */
 

@@ -1,0 +1,8 @@
+# Secrets — never commit real credentials
+.env
+
+# Node
+node_modules/
+
+# Build artifacts (regenerate via scripts/parse_scrobbles.mjs)
+res/build/
