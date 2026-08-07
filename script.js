@@ -12,6 +12,7 @@ let albums = [];          // fetched albums, each row contains .reviews[]
 let searchTerm = "";
 let activeGenre = "all";
 let sortBy = "rating-desc";
+let refreshSeq = 0;       // bumped when a write re-fetches the dataset
 
 /* ---------- DOM references ---------- */
 
@@ -97,6 +98,29 @@ async function apiRequest(path, options) {
 }
 
 const getJSON = (path) => apiRequest(path, { headers: API.headers });
+
+/* ---------- Data cache (localStorage, stale-while-revalidate) ---------- */
+
+const ALBUMS_CACHE_KEY = "albums";
+const ALBUMS_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+function cachedAlbums() {
+  const v = DataCache.read(ALBUMS_CACHE_KEY, ALBUMS_CACHE_TTL);
+  return Array.isArray(v) ? v : null;
+}
+
+function staleAlbums() {
+  const v = DataCache.peek(ALBUMS_CACHE_KEY);
+  return Array.isArray(v) ? v : null;
+}
+
+function storeAlbums(list) {
+  DataCache.write(ALBUMS_CACHE_KEY, list);
+}
+
+function invalidateAlbums() {
+  DataCache.remove(ALBUMS_CACHE_KEY);
+}
 
 /* ---------- Data: READ (GET /albums) ---------- */
 
@@ -419,6 +443,22 @@ async function runTrends() {
 }
 
 async function fetchScrobblesInRange(from, to) {
+  // Cache counts per date range (scrobbles only change via reseed).
+  const key = "scrobbles." + from + "." + to;
+  const fresh = DataCache.read(key, 10 * 60 * 1000);
+  if (Array.isArray(fresh)) return fresh;
+  try {
+    const rows = await fetchScrobblesInRangeRaw(from, to);
+    DataCache.write(key, rows);
+    return rows;
+  } catch (err) {
+    const stale = DataCache.peek(key);
+    if (Array.isArray(stale)) return stale;
+    throw err;
+  }
+}
+
+async function fetchScrobblesInRangeRaw(from, to) {
   const base =
     "/scrobbles?select=album_id" +
     "&scrobbled_at=gte." + encodeURIComponent(from + "T00:00:00") +
@@ -426,7 +466,6 @@ async function fetchScrobblesInRange(from, to) {
   const STEP = 1000;
   let all = [];
   let offset = 0;
-  let total = null;
 
   while (true) {
     const res = await fetch(API.base + base, {
@@ -443,12 +482,11 @@ async function fetchScrobblesInRange(from, to) {
       throw new Error(detail);
     }
     const part = await res.json();
+    if (!Array.isArray(part)) throw new Error("Unexpected response from server.");
     all = all.concat(part);
-    const cr = res.headers.get("Content-Range");
-    const m = cr && cr.match(/\/(\d+)\s*$/);
-    total = m ? Number(m[1]) : all.length;
+    // A partial page means we reached the end; no reliance on Content-Range.
+    if (part.length < STEP) break;
     offset += STEP;
-    if (offset >= total || part.length === 0) break;
   }
   return all;
 }
@@ -593,9 +631,18 @@ albumForm.addEventListener("submit", async (e) => {
     });
     closeModal();
     toast("Album added successfully.");
-    albums = await fetchAlbums();
-    populateGenreOptions();
-    renderAlbums();
+    refreshSeq++;
+    try {
+      albums = await fetchAlbums();
+      storeAlbums(albums);
+      populateGenreOptions();
+      renderAlbums();
+    } catch (err) {
+      // The POST succeeded but the refresh failed: drop the cache so the
+      // next page load refetches, and keep the current list until then.
+      invalidateAlbums();
+      toast("Album added, but could not refresh the list.", "error");
+    }
   } catch (err) {
     albumFormError.textContent = "Failed to add album: " + err.message;
     albumFormError.classList.remove("hidden");
@@ -613,12 +660,32 @@ async function init() {
     showBanner();
     return;
   }
+
+  // Render from cache immediately; only hit the network when the
+  // cache is missing or older than the TTL (stale-while-revalidate).
+  const cached = cachedAlbums();
+  const stale = cached ? null : staleAlbums();
+  if (cached || stale) {
+    albums = cached || stale;
+    populateGenreOptions();
+    renderAlbums();
+  }
+  if (cached) return;
+
   try {
-    albums = await fetchAlbums();
+    const seq = refreshSeq;
+    const fresh = await fetchAlbums();
+    if (seq !== refreshSeq) {
+      loadingEl.classList.add("hidden"); // a write-owned refresh landed first
+      return;
+    }
+    albums = fresh;
+    storeAlbums(fresh);
     populateGenreOptions();
     renderAlbums();
   } catch (err) {
-    setError(err.message);
+    // Keep showing the stale cache if one was rendered.
+    if (!stale) setError(err.message);
   }
 }
 

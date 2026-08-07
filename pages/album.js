@@ -127,6 +127,47 @@ async function fetchAlbum() {
   return rows && rows.length > 0 ? rows[0] : null;
 }
 
+/* ---------- Data cache (localStorage, stale-while-revalidate) ---------- */
+
+const ALBUMS_CACHE_KEY = "albums";
+const ALBUMS_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+function findCachedAlbum(list) {
+  return list.find((a) => String(a.id) === String(albumId)) || null;
+}
+
+function cachedAlbum() {
+  const list = DataCache.read(ALBUMS_CACHE_KEY, ALBUMS_CACHE_TTL);
+  return Array.isArray(list) ? findCachedAlbum(list) : null;
+}
+
+function staleAlbum() {
+  const list = DataCache.peek(ALBUMS_CACHE_KEY);
+  return Array.isArray(list) ? findCachedAlbum(list) : null;
+}
+
+function upsertCachedAlbum(a) {
+  // Only update an existing dataset; never create a partial one (the index
+  // page would render a 1-album list for the TTL instead of refetching).
+  const raw = DataCache.peekRaw(ALBUMS_CACHE_KEY);
+  if (!raw || !Array.isArray(raw.value)) return;
+  const list = raw.value;
+  const i = list.findIndex((x) => String(x.id) === String(a.id));
+  if (i >= 0) list[i] = a;
+  else list.push(a);
+  DataCache.write(ALBUMS_CACHE_KEY, list, raw.at);
+}
+
+function removeCachedAlbum() {
+  const raw = DataCache.peekRaw(ALBUMS_CACHE_KEY);
+  if (!raw || !Array.isArray(raw.value)) return;
+  const list = raw.value;
+  const i = list.findIndex((x) => String(x.id) === String(albumId));
+  if (i < 0) return;
+  list.splice(i, 1);
+  DataCache.write(ALBUMS_CACHE_KEY, list, raw.at);
+}
+
 /* ---------- Rendering ---------- */
 
 function render() {
@@ -504,6 +545,7 @@ async function deleteAlbum() {
       headers: API_WRITE_HEADERS
     });
     toast("Album deleted.");
+    removeCachedAlbum();
     setTimeout(() => (location.href = "../index.html"), 800);
   } catch (err) {
     toast("Failed to delete album: " + err.message, "error");
@@ -513,31 +555,56 @@ async function deleteAlbum() {
 /* ---------- Reload & init ---------- */
 
 async function reload() {
-  album = await fetchAlbum();
+  try {
+    album = await fetchAlbum();
+  } catch (err) {
+    // The write committed but the refresh failed: drop the cache so the
+    // next page load refetches (mirrors the index page behaviour).
+    DataCache.remove(ALBUMS_CACHE_KEY);
+    throw err;
+  }
+  if (album) upsertCachedAlbum(album);
   render();
 }
-
 async function init() {
   if (!albumId) {
     loadingEl.classList.add("hidden");
     notFoundEl.classList.remove("hidden");
     return;
   }
+
+  const saved = localStorage.getItem("audiotaste_username");
+  if (saved) document.getElementById("r-username").value = saved;
+
+  // Render from cache immediately; only hit the network when the
+  // cache is missing or older than the TTL (stale-while-revalidate).
+  const cached = cachedAlbum();
+  const stale = cached ? null : staleAlbum();
+  if (cached || stale) {
+    album = cached || stale;
+    loadingEl.classList.add("hidden");
+    render();
+  }
+  if (cached) return;
+
   try {
     album = await fetchAlbum();
     if (!album) {
+      // Row is gone: drop the phantom from the cache and show not-found.
+      if (stale) removeCachedAlbum();
       loadingEl.classList.add("hidden");
       notFoundEl.classList.remove("hidden");
       return;
     }
+    upsertCachedAlbum(album);
     loadingEl.classList.add("hidden");
-    const saved = localStorage.getItem("audiotaste_username");
-    if (saved) document.getElementById("r-username").value = saved;
     render();
   } catch (err) {
-    loadingEl.classList.add("hidden");
-    notFoundEl.classList.remove("hidden");
-    notFoundEl.querySelector("p").textContent = "Could not load this album: " + err.message;
+    if (!stale) {
+      loadingEl.classList.add("hidden");
+      notFoundEl.classList.remove("hidden");
+      notFoundEl.querySelector("p").textContent = "Could not load this album: " + err.message;
+    }
   }
 }
 
