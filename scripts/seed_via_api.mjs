@@ -78,7 +78,10 @@ const iso = (ts) => {
 };
 
 const maxPlays = albums[0].plays;
-const ratingFor = (plays) => Math.round((3 + 7 * (plays / maxPlays)) * 10) / 10;
+// Only the single most-played album gets a perfect 10.0; every other
+// album is rated in (4, 10) scaled by its play count.
+const ratingFor = (plays) =>
+  plays === maxPlays ? 10.0 : Math.round((4.1 + 5.8 * (plays / maxPlays)) * 10) / 10;
 const times = (n) => "time" + (n === 1 ? "" : "s");
 
 const chunk = (arr, n) => { const o = []; for (let i = 0; i < arr.length; i += n) o.push(arr.slice(i, i + n)); return o; };

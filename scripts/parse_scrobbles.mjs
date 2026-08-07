@@ -15,6 +15,12 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const MIN_PLAYS = Number(process.argv[2] || 5);
 
+// Artists excluded entirely (scrobbles dropped, no albums emitted).
+// Matching is case-insensitive on the artist name.
+const BLACKLISTED_ARTISTS = ["r u s s e l b u c k"];
+const isBlacklisted = (artist) =>
+  BLACKLISTED_ARTISTS.some((b) => artist.trim().toLowerCase() === b.toLowerCase());
+
 const RAW = readFileSync("res/UltimateQuack.csv");
 
 let text;
@@ -59,6 +65,7 @@ for (const line of lines) {
     malformed++;
     continue;
   }
+  if (isBlacklisted(f[0])) continue; // blacklisted artist dropped entirely
   rows.push({ artist: f[0], album: f[1], track: f[2], ts: f[3] });
 }
 

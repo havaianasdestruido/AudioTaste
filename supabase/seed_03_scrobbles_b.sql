@@ -138,11 +138,6 @@ FROM (VALUES
   ('Vertigoaway — Singles & Sessions', 'Vertigoaway', 'nev3r_end1ng', '03 Jun 2026 18:48'::timestamp),
   ('Vertigoaway — Singles & Sessions', 'Vertigoaway', 'the well', '03 Jun 2026 18:46'::timestamp),
   ('Vertigoaway — Singles & Sessions', 'Vertigoaway', 'remeowved something', '03 Jun 2026 18:45'::timestamp),
-  ('r u s s e l b u c k — Singles & Sessions', 'r u s s e l b u c k', 'b-b-BASS DOWN LOW (GABBER TIME)', '03 Jun 2026 18:40'::timestamp),
-  ('r u s s e l b u c k — Singles & Sessions', 'r u s s e l b u c k', 'Just Be Competent', '03 Jun 2026 18:37'::timestamp),
-  ('r u s s e l b u c k — Singles & Sessions', 'r u s s e l b u c k', 'b-b-BASS DOWN LOW', '03 Jun 2026 18:35'::timestamp),
-  ('r u s s e l b u c k — Singles & Sessions', 'r u s s e l b u c k', 'Just Artist Struggles', '03 Jun 2026 18:34'::timestamp),
-  ('r u s s e l b u c k — Singles & Sessions', 'r u s s e l b u c k', 'EAT YOU UP', '03 Jun 2026 18:31'::timestamp),
   ('ida deerz — Singles & Sessions', 'ida deerz', 'attitude', '03 Jun 2026 18:25'::timestamp),
   ('Vertigoaway — Singles & Sessions', 'Vertigoaway', 'drowning timeline of the wavelength', '03 Jun 2026 18:24'::timestamp),
   ('Vertigoaway — Singles & Sessions', 'Vertigoaway', 'BREAK THIS THE BREAKING POINT 2 [BREAK CORPS 2]', '03 Jun 2026 18:05'::timestamp),
@@ -415,6 +410,11 @@ FROM (VALUES
   ('eel valley — Singles & Sessions', 'eel valley', 'dead to me', '23 May 2026 22:18'::timestamp),
   ('eel valley — Singles & Sessions', 'eel valley', 'the lake', '23 May 2026 22:16'::timestamp),
   ('eel valley — Singles & Sessions', 'eel valley', 'crater', '23 May 2026 22:14'::timestamp),
-  ('eel valley — Singles & Sessions', 'eel valley', 'flowers', '23 May 2026 22:13'::timestamp)
+  ('eel valley — Singles & Sessions', 'eel valley', 'flowers', '23 May 2026 22:13'::timestamp),
+  ('eel valley — Singles & Sessions', 'eel valley', 'dead to me', '23 May 2026 22:11'::timestamp),
+  ('SPARKLEWOLF RADIO — Singles & Sessions', 'SPARKLEWOLF RADIO', 'METALLIC MADNESS (BAD FUTURE)', '22 May 2026 22:07'::timestamp),
+  ('SPARKLEWOLF RADIO — Singles & Sessions', 'SPARKLEWOLF RADIO', 'the music that plays in my dumb little critter brain', '22 May 2026 22:06'::timestamp),
+  ('SPARKLEWOLF RADIO — Singles & Sessions', 'SPARKLEWOLF RADIO', 'EAT UR GUTZ!!!', '22 May 2026 22:04'::timestamp),
+  ('SPARKLEWOLF RADIO — Singles & Sessions', 'SPARKLEWOLF RADIO', 'SILLY PUPPY!', '22 May 2026 22:01'::timestamp)
 ) AS s(title, artist, track, scrobbled_at)
 JOIN public.albums a ON a.artist = s.artist AND a.title = s.title;

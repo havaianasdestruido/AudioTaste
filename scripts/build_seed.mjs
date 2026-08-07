@@ -31,8 +31,10 @@ const scrobbles = JSON.parse(readFileSync("res/build/scrobbles.json", "utf8"));
 const q = (s) => "'" + String(s).replace(/'/g, "''") + "'";
 
 const maxPlays = albums[0].plays;
+// Only the single most-played album gets a perfect 10.0; every other
+// album is rated in (4, 10) scaled by its play count.
 const ratingFor = (plays) =>
-  Math.round((3 + 7 * (plays / maxPlays)) * 10) / 10;
+  plays === maxPlays ? 10.0 : Math.round((4.1 + 5.8 * (plays / maxPlays)) * 10) / 10;
 
 const times = (n) => "time" + (n === 1 ? "" : "s");
 
