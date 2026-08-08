@@ -12,3 +12,6 @@ res/build/
 
 # Personal listening history export — keep out of the public repo
 res/UltimateQuack.csv
+
+# Vulnerability/audit reports — internal only, never public
+logs/
