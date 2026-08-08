@@ -7,6 +7,9 @@ config.js
 # Node
 node_modules/
 
+# Vercel deploy output (generated on the build machine, never committed)
+dist/
+
 # Build artifacts (regenerate via scripts/parse_scrobbles.mjs)
 res/build/
 
