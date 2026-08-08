@@ -15,7 +15,7 @@
 // LASTFM_API_KEY (see .env.example). If Spotify keys are absent, Last.fm
 // is used alone. Caches live under res/build/ (gitignored).
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
@@ -30,8 +30,14 @@ const ALBUMS_FILE = "res/build/albums.json";
 
 function argNum(name) {
   const i = args.indexOf(name);
-  return i >= 0 ? parseInt(args[i + 1], 10) : undefined;
+  if (i < 0 || i + 1 >= args.length) return undefined;
+  const n = parseInt(args[i + 1], 10);
+  return Number.isFinite(n) ? n : undefined;
 }
+
+// All outbound requests get a timeout so a wedged API can't stall a slice.
+const fetchWithTimeout = (url, opts = {}, ms = 15000) =>
+  fetch(url, { ...opts, signal: AbortSignal.timeout(ms) });
 
 function loadEnv() {
   try {
@@ -69,7 +75,9 @@ function loadCache(file) {
 
 function saveCache(file, cache) {
   mkdirSync(COVERS_DIR, { recursive: true });
-  writeFileSync(file, JSON.stringify(cache, null, 2));
+  const tmp = file + ".tmp";
+  writeFileSync(tmp, JSON.stringify(cache, null, 2));
+  renameSync(tmp, file); // atomic: readers never see a torn file
 }
 
 /* ---------- Spotify ---------- */
@@ -78,7 +86,7 @@ let spotifyToken = null;
 async function spotifyTokenGet() {
   if (spotifyToken) return spotifyToken;
   const cred = Buffer.from(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET).toString("base64");
-  const r = await fetch("https://accounts.spotify.com/api/token", {
+  const r = await fetchWithTimeout("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
       Authorization: "Basic " + cred,
@@ -97,7 +105,7 @@ async function spotifyCover(artist, album) {
   // Pseudo-albums ("Artist — Singles & Sessions") don't exist on Spotify;
   // search the artist and take their top album's art instead.
   const q = encodeURIComponent(album.includes("Singles & Sessions") ? artist : artist + " " + album);
-  const r = await fetch("https://api.spotify.com/v1/search?q=" + q + "&type=album&limit=1", {
+  const r = await fetchWithTimeout("https://api.spotify.com/v1/search?q=" + q + "&type=album&limit=1", {
     headers: { Authorization: "Bearer " + token }
   });
   if (r.status === 429) throw new Error("spotify rate limited");
@@ -121,7 +129,7 @@ async function lastfmCover(artist, album) {
     format: "json"
   });
   if (method === "album.getinfo") params.set("album", album);
-  const r = await fetch("https://ws.audioscrobbler.com/2.0/?" + params.toString());
+  const r = await fetchWithTimeout("https://ws.audioscrobbler.com/2.0/?" + params.toString());
   if (!r.ok) return null;
   const j = await r.json();
   if (j.error === 29) throw new Error("lastfm rate limited");
@@ -144,6 +152,24 @@ async function coverFor(artist, album) {
   if (HAS_LASTFM) {
     const url = await lastfmCover(artist, album);
     if (url) return { url, source: "lastfm" };
+  }
+  return null;
+}
+
+// Retry rate-limited lookups up to 3 attempts with a 15s backoff.
+async function coverForWithRetry(artist, title) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await coverFor(artist, title);
+    } catch (e) {
+      const msg = String(e.message);
+      if (msg.includes("rate limited") && attempt < 2) {
+        console.log("  ...rate limited, retrying in 15s (" + (attempt + 1) + "/2)");
+        await sleep(15000);
+      } else {
+        throw e;
+      }
+    }
   }
   return null;
 }
@@ -174,15 +200,13 @@ async function runFetch() {
     if (chunk[key] !== undefined || canonical[key] !== undefined) { skipped++; continue; }
     let result = null;
     try {
-      result = await coverFor(a.artist, a.title);
+      result = await coverForWithRetry(a.artist, a.title);
       chunk[key] = result;
       fetched++;
       if (result) console.log("  OK  " + (result.source === "spotify" ? "S" : "L") + " " + a.artist + " - " + a.title);
       else { failed++; console.log("  MISS " + a.artist + " - " + a.title); }
     } catch (e) {
-      const msg = String(e.message);
-      console.log("  ERR " + a.artist + " - " + a.title + ": " + msg);
-      if (msg.includes("rate limited")) { console.log("  ...waiting 15s for rate limit"); await sleep(15000); }
+      console.log("  ERR " + a.artist + " - " + a.title + ": " + e.message);
     }
     await sleep(150); // be polite to both APIs
   }
@@ -227,7 +251,7 @@ async function updateDb(albums) {
     Authorization: "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY,
     "Content-Type": "application/json"
   };
-  const r = await fetch(base + "/albums?select=id,artist,title,cover_url", { headers: H });
+  const r = await fetchWithTimeout(base + "/albums?select=id,artist,title,cover_url", { headers: H });
   if (!r.ok) throw new Error("GET albums -> " + r.status);
   const rows = await r.json();
   const map = new Map(rows.map((x) => [x.artist + "\u0000" + x.title, x]));
@@ -238,7 +262,7 @@ async function updateDb(albums) {
     if (!row) { skipped++; continue; }
     const newVal = a.cover_url || null;
     if ((row.cover_url || null) === newVal) continue;
-    const p = await fetch(base + "/albums?id=eq." + row.id, {
+    const p = await fetchWithTimeout(base + "/albums?id=eq." + row.id, {
       method: "PATCH",
       headers: { ...H, Prefer: "return=minimal" },
       body: JSON.stringify({ cover_url: newVal })
