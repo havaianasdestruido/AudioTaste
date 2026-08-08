@@ -19,7 +19,9 @@ const DataCache = {
       if (!raw) return null;
       const j = JSON.parse(raw);
       if (!j || !("value" in j)) return null;
-      const at = Number.isFinite(j.at) ? j.at : 0;
+      // Clamp the stored timestamp to now so a tampered future "at" can
+      // never make the TTL expire in the distant future.
+      const at = Math.min(Number.isFinite(j.at) ? j.at : 0, Date.now());
       if (ttlMs != null && Date.now() - at > ttlMs) return null;
       return j.value;
     } catch {

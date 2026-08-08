@@ -206,7 +206,10 @@ const Covers = {
       const raw = localStorage.getItem(coverCacheKey(artist, title));
       if (!raw) return null;
       const j = JSON.parse(raw);
-      return j.url || null;
+      // Treat the cache as untrusted: only https image URLs, with a TTL.
+      if (typeof j.url !== "string" || !/^https:\/\//i.test(j.url)) return null;
+      if (j.at && Date.now() - j.at > 30 * 24 * 60 * 60 * 1000) return null;
+      return j.url;
     } catch {
       return null;
     }
