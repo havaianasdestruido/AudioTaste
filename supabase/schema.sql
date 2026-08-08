@@ -16,22 +16,22 @@ drop table if exists public.albums;
 
 create table public.albums (
   id           bigint generated always as identity primary key,
-  title        text not null,
-  artist       text not null,
-  release_year integer,
-  genre        text,
-  cover_url    text,              -- optional: https:// link to cover art
+  title        text not null check (char_length(title) between 1 and 200),
+  artist       text not null check (char_length(artist) between 1 and 200),
+  release_year integer check (release_year is null or (release_year between 1900 and 2100)),
+  genre        text check (genre is null or char_length(genre) <= 60),
+  cover_url    text check (cover_url is null or cover_url ~* '^https://'),  -- optional: https link to cover art
   description  text,
-  plays        integer not null default 0,  -- scrobbles in the owner's history
+  plays        integer not null default 0 check (plays >= 0),  -- scrobbles in the owner's history
   created_at   timestamptz not null default now()
 );
 
 create table public.reviews (
   id          bigint generated always as identity primary key,
   album_id    bigint not null references public.albums(id) on delete cascade,
-  username    text not null,
+  username    text not null check (char_length(username) between 1 and 80),
   rating      numeric(3,1) not null check (rating >= 0 and rating <= 10),
-  review_text text not null,
+  review_text text not null check (char_length(review_text) between 1 and 2000),
   created_at  timestamptz not null default now()
 );
 
