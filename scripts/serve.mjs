@@ -65,6 +65,12 @@ createServer((req, res) => {
   }
 
   let rel = normalize(url === "/" ? "/index.html" : url).replace(/^([/\\])+/, "");
+  // Never serve dotfiles (.env, .gitignore, .env.example, ...).
+  if (rel.split(/[\\/]/).some((seg) => seg.startsWith("."))) {
+    res.writeHead(403);
+    res.end("forbidden");
+    return;
+  }
   if (rel.includes("..")) {
     res.writeHead(403);
     res.end("forbidden");
