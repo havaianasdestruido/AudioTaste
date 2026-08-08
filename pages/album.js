@@ -315,10 +315,6 @@ function reviewHTML(review) {
     '<span class="score">' + fmtAvg(Number(review.rating)) + " / 10</span></span>" +
     "</div>" +
     '<p class="review-text">' + esc(review.review_text) + "</p>" +
-    '<div class="review-actions">' +
-    '<button class="btn-link" data-edit="' + esc(review.id) + '">Edit</button>' +
-    '<button class="btn-link danger" data-del="' + esc(review.id) + '">Delete</button>' +
-    "</div>" +
     "</div>"
   );
 }
@@ -385,91 +381,6 @@ reviewForm.addEventListener("submit", async (e) => {
     submitBtn.disabled = false;
   }
 });
-
-/* ---------- Edit / delete reviews (event delegation) ---------- */
-
-reviewsListEl.addEventListener("click", (e) => {
-  const editBtn = e.target.closest("[data-edit]");
-  const delBtn = e.target.closest("[data-del]");
-  if (editBtn) startEditReview(Number(editBtn.dataset.edit));
-  if (delBtn) deleteReview(Number(delBtn.dataset.del));
-});
-
-function startEditReview(reviewId) {
-  const review = (album.reviews || []).find((r) => r.id === reviewId);
-  if (!review) return;
-  const node = document.getElementById("review-" + reviewId);
-  if (!node) return;
-
-  node.innerHTML =
-    '<div class="review-edit">' +
-    '<label>Rating (0.0 – 10.0)' +
-    '<input type="number" id="edit-rating-' + reviewId + '" min="0" max="10" step="0.1" value="' + review.rating + '"></label>' +
-    '<label>Review<textarea id="edit-text-' + reviewId + '" rows="4" maxlength="2000">' +
-    esc(review.review_text) + "</textarea></label>" +
-    '<p class="form-error hidden" id="edit-error-' + reviewId + '"></p>' +
-    '<div class="edit-actions">' +
-    '<button class="btn btn-primary btn-sm" id="save-review-' + reviewId + '">Save</button>' +
-    '<button class="btn btn-ghost btn-sm" id="cancel-review-' + reviewId + '">Cancel</button>' +
-    "</div></div>";
-
-  document.getElementById("save-review-" + reviewId).addEventListener("click", async () => {
-    const rating = document.getElementById("edit-rating-" + reviewId).value;
-    const text = document.getElementById("edit-text-" + reviewId).value.trim();
-    const error = validateReview(rating, text, review.username);
-    const errEl = document.getElementById("edit-error-" + reviewId);
-    if (error) {
-      errEl.textContent = error;
-      errEl.classList.remove("hidden");
-      return;
-    }
-    errEl.classList.add("hidden");
-    await saveReview(reviewId, Number(rating), text);
-  });
-
-  document.getElementById("cancel-review-" + reviewId).addEventListener("click", renderReviews);
-}
-
-/* ---------- UPDATE review (PATCH /reviews?id=eq.X) ---------- */
-
-async function saveReview(reviewId, rating, text) {
-  const btn = document.getElementById("save-review-" + reviewId);
-  if (btn) btn.disabled = true;
-  try {
-    // PATCH request updates only the provided fields.
-    await apiRequest("/reviews?id=eq." + reviewId, {
-      method: "PATCH",
-      headers: API_WRITE_HEADERS,
-      body: JSON.stringify({ rating, review_text: text })
-    });
-    toast("Review updated successfully.");
-    await reload();
-  } catch (err) {
-    const errEl = document.getElementById("edit-error-" + reviewId);
-    if (errEl) {
-      errEl.textContent = "Failed to update: " + err.message;
-      errEl.classList.remove("hidden");
-    }
-    toast("Failed to update review.", "error");
-  }
-}
-
-/* ---------- DELETE review (DELETE /reviews?id=eq.X) ---------- */
-
-async function deleteReview(reviewId) {
-  if (!confirm("Delete this review permanently?")) return;
-  try {
-    // DELETE request removes the row.
-    await apiRequest("/reviews?id=eq." + reviewId, {
-      method: "DELETE",
-      headers: API_WRITE_HEADERS
-    });
-    toast("Review deleted.");
-    await reload();
-  } catch (err) {
-    toast("Failed to delete review: " + err.message, "error");
-  }
-}
 
 /* ---------- Edit / delete album (admin) ---------- */
 
