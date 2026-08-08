@@ -92,6 +92,8 @@ async function apiRequest(path, options) {
     } catch (e) {
       /* response body was not JSON */
     }
+    // Never surface long/sensitive error bodies (PostgREST may include SQL).
+    if (detail.length > 200) detail = detail.slice(0, 200) + "\u2026";
     throw new Error(detail);
   }
   return res.status === 204 ? null : res.json();
@@ -125,9 +127,9 @@ function invalidateAlbums() {
 /* ---------- Data: READ (GET /albums) ---------- */
 
 async function fetchAlbums() {
-  // GET request to the Supabase REST API.
+  // GET request to the Supabase REST API (capped so it can never fetch unbounded).
   return getJSON(
-    "/albums?select=" + encodeURIComponent(ALBUM_SELECT) + "&order=created_at.asc"
+    "/albums?select=" + encodeURIComponent(ALBUM_SELECT) + "&order=created_at.asc&limit=1000"
   );
 }
 
@@ -135,8 +137,10 @@ async function fetchAlbums() {
 
 function avgRating(reviews) {
   if (!reviews || reviews.length === 0) return null;
-  const sum = reviews.reduce((total, r) => total + Number(r.rating), 0);
-  return sum / reviews.length;
+  const nums = reviews.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n));
+  if (nums.length === 0) return null;
+  const sum = nums.reduce((total, n) => total + n, 0);
+  return sum / nums.length;
 }
 
 function fmtAvg(value) {

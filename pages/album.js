@@ -63,8 +63,10 @@ function formatDate(iso) {
 
 function avgRating(reviews) {
   if (!reviews || reviews.length === 0) return null;
-  const sum = reviews.reduce((t, r) => t + Number(r.rating), 0);
-  return sum / reviews.length;
+  const nums = reviews.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n));
+  if (nums.length === 0) return null;
+  const sum = nums.reduce((total, n) => total + n, 0);
+  return sum / nums.length;
 }
 
 function fmtAvg(value) {
@@ -111,6 +113,8 @@ async function apiRequest(path, options) {
     } catch (e) {
       /* non-JSON error body */
     }
+    // Never surface long/sensitive error bodies (PostgREST may include SQL).
+    if (detail.length > 200) detail = detail.slice(0, 200) + "\u2026";
     throw new Error(detail);
   }
   return res.status === 204 ? null : res.json();
