@@ -13,6 +13,7 @@
 
 const params = new URLSearchParams(location.search);
 const albumId = params.get("id");
+const albumIdValid = albumId !== null && /^\d+$/.test(albumId);
 let album = null; // current album with .reviews[]
 
 const ALBUM_SELECT =
@@ -257,10 +258,10 @@ const Covers = {
 };
 
 function buildHeroHTML() {
-  const year = album.release_year ? " " + album.release_year : "";
+  const year = album.release_year ? " " + esc(album.release_year) : "";
   const genre = album.genre ? " \u00b7 " + esc(album.genre) : "";
   const plays = album.plays
-    ? " \u00b7 " + album.plays + " play" + (album.plays === 1 ? "" : "s")
+    ? " \u00b7 " + esc(album.plays) + " play" + (album.plays === 1 ? "" : "s")
     : "";
   const avg = avgRating(album.reviews);
   const count = album.reviews ? album.reviews.length : 0;
@@ -299,7 +300,7 @@ function buildHeroHTML() {
 function reviewHTML(review) {
   const date = formatDate(review.created_at);
   return (
-    '<div class="review" id="review-' + review.id + '">' +
+    '<div class="review" id="review-' + esc(review.id) + '">' +
     '<div class="review-head">' +
     '<span class="user">' + esc(review.username) + "</span>" +
     (date ? '<span class="review-date">' + date + "</span>" : "") +
@@ -308,8 +309,8 @@ function reviewHTML(review) {
     "</div>" +
     '<p class="review-text">' + esc(review.review_text) + "</p>" +
     '<div class="review-actions">' +
-    '<button class="btn-link" data-edit="' + review.id + '">Edit</button>' +
-    '<button class="btn-link danger" data-del="' + review.id + '">Delete</button>' +
+    '<button class="btn-link" data-edit="' + esc(review.id) + '">Edit</button>' +
+    '<button class="btn-link danger" data-del="' + esc(review.id) + '">Delete</button>' +
     "</div>" +
     "</div>"
   );
@@ -504,6 +505,12 @@ document.getElementById("edit-album-form").addEventListener("submit", async (e) 
     errEl.classList.remove("hidden");
     return;
   }
+  const cover = document.getElementById("e-cover").value.trim();
+  if (cover && !/^https:\/\//i.test(cover)) {
+    errEl.textContent = "Cover image URL must start with https://";
+    errEl.classList.remove("hidden");
+    return;
+  }
   errEl.classList.add("hidden");
 
   const saveBtn = document.getElementById("save-edit-btn");
@@ -567,7 +574,7 @@ async function reload() {
   render();
 }
 async function init() {
-  if (!albumId) {
+  if (!albumIdValid) {
     loadingEl.classList.add("hidden");
     notFoundEl.classList.remove("hidden");
     return;

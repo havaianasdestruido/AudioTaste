@@ -304,10 +304,10 @@ function getFilteredAlbums() {
 }
 
 function cardHTML(album) {
-  const year = album.release_year ? " " + album.release_year : "";
+  const year = album.release_year ? " " + esc(album.release_year) : "";
   const genre = album.genre ? " \u00b7 " + esc(album.genre) : "";
   const plays = album.plays
-    ? " \u00b7 " + album.plays + " play" + (album.plays === 1 ? "" : "s")
+    ? " \u00b7 " + esc(album.plays) + " play" + (album.plays === 1 ? "" : "s")
     : "";
   const rating =
     album.avg !== null
@@ -317,15 +317,15 @@ function cardHTML(album) {
 
   return (
     '<article class="album-card">' +
-    '<a href="pages/album.html?id=' + album.id + '">' + coverHTML(album) + "</a>" +
+    '<a href="pages/album.html?id=' + esc(album.id) + '">' + coverHTML(album) + "</a>" +
     '<div class="card-body">' +
     '<h3 class="card-title" title="' + esc(album.title) + '">' + esc(album.title) + "</h3>" +
     '<p class="card-artist">' + esc(album.artist) + "</p>" +
     '<p class="card-meta">' + (year || "") + genre + plays + "</p>" +
     '<div class="card-rating">' + rating + "</div>" +
-    '<a class="btn btn-ghost btn-view" href="pages/album.html?id=' + album.id + '">' +
+    '<a class="btn btn-ghost btn-view" href="pages/album.html?id=' + esc(album.id) + '">' +
     "View Album" +
-    (reviewCount > 0 ? " \u00b7 " + reviewCount + " review" + (reviewCount === 1 ? "" : "s") : "") +
+    (reviewCount > 0 ? " \u00b7 " + esc(reviewCount) + " review" + (reviewCount === 1 ? "" : "s") : "") +
     "</a>" +
     "</div></article>"
   );
@@ -557,9 +557,9 @@ function trendItemHTML(e, rank, groupBy) {
   return (
     '<li class="trend-item">' +
     '<span class="trend-rank">' + rank + "</span>" +
-    '<a class="trend-cover" href="pages/album.html?id=' + a.id + '">' + coverHTML(a) + "</a>" +
+    '<a class="trend-cover" href="pages/album.html?id=' + esc(a.id) + '">' + coverHTML(a) + "</a>" +
     '<div class="trend-info">' +
-    '<a class="trend-title" href="pages/album.html?id=' + a.id + '">' + esc(a.title) + "</a>" +
+    '<a class="trend-title" href="pages/album.html?id=' + esc(a.id) + '">' + esc(a.title) + "</a>" +
     '<span class="trend-artist">' + esc(a.artist) + "</span>" +
     "</div>" +
     '<span class="trend-stats">' +
@@ -597,6 +597,10 @@ function validateAlbumForm() {
   const year = document.getElementById("f-year").value.trim();
   if (year && (Number(year) < 1900 || Number(year) > 2100)) {
     return "Release year must be between 1900 and 2100.";
+  }
+  const cover = document.getElementById("f-cover").value.trim();
+  if (cover && !/^https:\/\//i.test(cover)) {
+    return "Cover image URL must start with https://";
   }
   return "";
 }
