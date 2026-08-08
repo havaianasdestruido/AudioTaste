@@ -12,8 +12,9 @@
 //   node scripts/seed_via_api.mjs --no-reset # skip the DELETE phase
 //
 // Reads res/build/albums.json and res/build/scrobbles.json (output of
-// scripts/parse_scrobbles.mjs). Uses only the anon key, so it exercises
-// the exact same REST surface the browser app uses.
+// scripts/parse_scrobbles.mjs). Uses the service_role key from .env when
+// present (bypasses RLS for the destructive reseed); falls back to the
+// anon key from config.js otherwise.
 
 import { readFileSync } from "node:fs";
 

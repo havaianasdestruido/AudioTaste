@@ -5,9 +5,10 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-const CHUNKS = Number(process.argv[2] || 8);
-
 const albums = JSON.parse(readFileSync("res/build/albums.json", "utf8"));
+
+// Clamp the chunk count to a sane range; NaN / 0 / negatives become 8.
+const CHUNKS = Math.max(1, Math.min(Number(process.argv[2] || 8) || 8, albums.length));
 const size = Math.ceil(albums.length / CHUNKS);
 
 for (let i = 0; i < CHUNKS; i++) {

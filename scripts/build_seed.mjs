@@ -109,7 +109,10 @@ const chunk = (arr, n) => {
 };
 
 chunk(scrobbles, BATCH).forEach((batch, i) => {
-  const letter = String.fromCharCode(97 + i); // a, b, c, ...
+  // a, b, ..., z, aa, ab, ... (never falls back to punctuation)
+  const letter = i < 26
+    ? String.fromCharCode(97 + i)
+    : String.fromCharCode(97 + Math.floor(i / 26) - 1) + String.fromCharCode(97 + (i % 26));
   const rows = batch
     .map((s) =>
       "  (" + q(s.title) + ", " + q(s.artist) + ", " + q(s.track) + ", " + q(s.ts) + "::timestamp)"

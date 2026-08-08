@@ -18,8 +18,10 @@ const MIN_PLAYS = Number(process.argv[2] || 5);
 // Artists excluded entirely (scrobbles dropped, no albums emitted).
 // Matching is case-insensitive on the artist name.
 const BLACKLISTED_ARTISTS = ["r u s s e l b u c k"];
+// Normalize whitespace so internal double-spaces / NBSP can't bypass.
+const norm = (s) => String(s).trim().toLowerCase().replace(/\s+/g, " ");
 const isBlacklisted = (artist) =>
-  BLACKLISTED_ARTISTS.some((b) => artist.trim().toLowerCase() === b.toLowerCase());
+  BLACKLISTED_ARTISTS.some((b) => norm(artist) === norm(b));
 
 const RAW = readFileSync("res/UltimateQuack.csv");
 
@@ -59,6 +61,7 @@ function splitCSV(line) {
 const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
 const rows = [];
 let malformed = 0;
+const seen = new Set(); // dedupe exact duplicate scrobbles (artist+album+track+ts)
 for (const line of lines) {
   const f = splitCSV(line).map((s) => s.trim());
   if (f.length !== 4 || !f[3]) {
@@ -66,6 +69,9 @@ for (const line of lines) {
     continue;
   }
   if (isBlacklisted(f[0])) continue; // blacklisted artist dropped entirely
+  const dedupeKey = f[0] + "\u0000" + f[1] + "\u0000" + f[2] + "\u0000" + f[3];
+  if (seen.has(dedupeKey)) continue;
+  seen.add(dedupeKey);
   rows.push({ artist: f[0], album: f[1], track: f[2], ts: f[3] });
 }
 
@@ -79,13 +85,16 @@ for (const r of rows) {
       plays: 0,
       first: r.ts,
       last: r.ts,
+      firstMs: Date.parse(r.ts),
+      lastMs: Date.parse(r.ts),
       tracks: new Map()
     });
   }
   const e = map.get(key);
   e.plays++;
-  if (r.ts < e.first) e.first = r.ts;
-  if (r.ts > e.last) e.last = r.ts;
+  const ms = Date.parse(r.ts);
+  if (Number.isFinite(ms) && ms < e.firstMs) { e.firstMs = ms; e.first = r.ts; }
+  if (Number.isFinite(ms) && ms > e.lastMs) { e.lastMs = ms; e.last = r.ts; }
   e.tracks.set(r.track, (e.tracks.get(r.track) || 0) + 1);
 }
 
