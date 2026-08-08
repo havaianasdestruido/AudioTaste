@@ -11,7 +11,7 @@
 
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { renderConfig } from "./config-template.mjs";
 
 const PORT = parseInt(process.env.PORT || "8080", 10);
@@ -56,10 +56,24 @@ const MIME = {
 };
 
 createServer((req, res) => {
-  const url = decodeURIComponent((req.url || "/").split("?")[0]);
+  let url;
+  try {
+    url = decodeURIComponent((req.url || "/").split("?")[0]);
+  } catch {
+    // Malformed percent-encoding must never crash the server (DoS).
+    res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("bad request");
+    return;
+  }
+
+  const SEC = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  };
 
   if (url === "/config.js") {
-    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store" });
+    res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "no-store", ...SEC });
     res.end(configJs());
     return;
   }
@@ -76,14 +90,24 @@ createServer((req, res) => {
     res.end("forbidden");
     return;
   }
-  const file = join(ROOT, rel);
+  // Resolve and confirm the file stays inside ROOT (defense in depth).
+  const file = resolve(ROOT, rel);
+  if (file !== ROOT && !file.startsWith(ROOT + sep)) {
+    res.writeHead(403);
+    res.end("forbidden");
+    return;
+  }
   if (!existsSync(file) || !statSync(file).isFile()) {
-    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...SEC });
     res.end("404 not found");
     return;
   }
   const body = readFileSync(file);
-  res.writeHead(200, { "Content-Type": MIME[extname(file).toLowerCase()] || "application/octet-stream" });
+  res.writeHead(200, {
+    "Content-Type": MIME[extname(file).toLowerCase()] || "application/octet-stream",
+    "Cache-Control": "no-store",
+    ...SEC
+  });
   res.end(body);
 }).listen(PORT, () => {
   const mode = env.SUPABASE_ANON_KEY ? "from .env" : "PLACEHOLDER (fill .env!)";
