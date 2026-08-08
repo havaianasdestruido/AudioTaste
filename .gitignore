@@ -9,3 +9,6 @@ node_modules/
 
 # Build artifacts (regenerate via scripts/parse_scrobbles.mjs)
 res/build/
+
+# Personal listening history export — keep out of the public repo
+res/UltimateQuack.csv
