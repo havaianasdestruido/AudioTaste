@@ -137,7 +137,11 @@ async function lastfmCover(artist, album) {
   if (!list || !list.length) return null;
   for (const size of ["mega", "extralarge", "large"]) {
     const found = list[0].image.find((i) => i.size === size && i["#text"]);
-    if (found) return found["#text"];
+    if (found) {
+      // Last.fm can return http:// URLs; always upgrade to https.
+      const u = found["#text"];
+      return u.startsWith("//") ? "https:" + u : u.replace(/^http:/i, "https:");
+    }
   }
   return null;
 }
