@@ -5,8 +5,8 @@ import { injectSpeedInsights } from './speed-insights.mjs';
 // Initialize Speed Insights
 // The script will automatically track web vitals and performance metrics
 injectSpeedInsights({
-  // Enable debug logging in development (will not track data in dev mode anyway)
-  debug: true,
-  // Sample rate set to 1 (100% of events sent in production)
-  sampleRate: 1
+  // No debug logging in production
+  debug: false,
+  // Sample rate at 50% of events in production
+  sampleRate: 0.5
 });
