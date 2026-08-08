@@ -51,12 +51,12 @@ create index scrobbles_album_id_idx on public.scrobbles (album_id);
 create index scrobbles_at_idx      on public.scrobbles (scrobbled_at);
 
 -- ---------- Row Level Security ----------
--- RLS is enabled. Because this app has no login system, we add
--- permissive policies so the anonymous (anon) key can read, insert,
--- update and delete. Scrobbles are read-only from the app. In a real
--- application you would restrict writes to authenticated users or the
--- service role only, and you would NEVER expose the service role key
--- in the browser.
+-- RLS is enabled. Because this app has no login system, the anonymous
+-- (anon) key can SELECT and INSERT (Add Album / Submit Review). UPDATE and
+-- DELETE are REVOKED: a public anon key must never be able to edit or wipe
+-- existing rows. Scrobbles are read-only. Edit/Delete UI actions need an
+-- authenticated path or a backend that uses the service role key, which
+-- must NEVER be exposed in the browser.
 
 alter table public.albums    enable row level security;
 alter table public.reviews   enable row level security;
@@ -64,12 +64,8 @@ alter table public.scrobbles enable row level security;
 
 create policy "albums_select_anon"   on public.albums    for select using (true);
 create policy "albums_insert_anon"   on public.albums    for insert with check (true);
-create policy "albums_update_anon"   on public.albums    for update using (true);
-create policy "albums_delete_anon"   on public.albums    for delete using (true);
 
 create policy "reviews_select_anon"  on public.reviews   for select using (true);
 create policy "reviews_insert_anon"  on public.reviews   for insert with check (true);
-create policy "reviews_update_anon"  on public.reviews   for update using (true);
-create policy "reviews_delete_anon"  on public.reviews   for delete using (true);
 
 create policy "scrobbles_select_anon" on public.scrobbles for select using (true);
